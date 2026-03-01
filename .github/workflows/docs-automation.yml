@@ -17,6 +17,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Fetch base branch
+        run: git fetch origin ${{ github.event.pull_request.base.ref }}
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -36,11 +39,11 @@ jobs:
         run: |
           echo "── Copilot CLI: generate PR description ──"
           echo "This step would run:"
-          echo "  copilot-cli summarize-pr --diff \$(git diff origin/main...HEAD)"
+          echo "  copilot-cli summarize-pr --diff \$(git diff origin/${{ github.event.pull_request.base.ref }}...HEAD)"
           echo ""
           echo "For now, generating a basic diff stat:"
           echo '```' > /tmp/pr-summary.md
-          git diff --stat origin/main...HEAD >> /tmp/pr-summary.md
+          git diff --stat origin/${{ github.event.pull_request.base.ref }}...HEAD >> /tmp/pr-summary.md
           echo '```' >> /tmp/pr-summary.md
           cat /tmp/pr-summary.md
 
@@ -53,7 +56,7 @@ jobs:
           TIMESTAMP=$(date -u +"%Y-%m-%d")
           echo "## [$TIMESTAMP] - Auto-generated" > /tmp/changelog-entry.md
           echo "" >> /tmp/changelog-entry.md
-          git log --oneline origin/main...HEAD >> /tmp/changelog-entry.md
+          git log --oneline origin/${{ github.event.pull_request.base.ref }}...HEAD >> /tmp/changelog-entry.md
           cat /tmp/changelog-entry.md
 
       - name: Post summary as PR comment

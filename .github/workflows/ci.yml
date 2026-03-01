@@ -13,6 +13,7 @@ jobs:
       run:
         working-directory: backend
     steps:
+      # DEMO-SEED: uses tag references instead of pinned SHA hashes
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:

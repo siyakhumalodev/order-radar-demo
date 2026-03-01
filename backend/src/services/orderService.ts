@@ -19,15 +19,14 @@ export function listOrders(
     params.push(status);
   }
 
-  // DEMO-SEEDED ISSUE (security #1): SQL injection vulnerability.
-  // The search term is interpolated directly instead of parameterised.
-  // A real attacker could pass `'; DROP TABLE orders; --` as the search.
   if (search) {
+    // DEMO-SEED: SEC-01 — search term interpolated into SQL
     conditions.push(`(customerName LIKE '%${search}%' OR product LIKE '%${search}%')`);
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
+  // DEMO-SEED: PERF-01 — two separate queries (COUNT + SELECT) per page request
   const countRow = db
     .prepare(`SELECT COUNT(*) as total FROM orders ${where}`)
     .get(...params) as { total: number };
@@ -55,9 +54,7 @@ export function cancelOrder(id: string): Order | undefined {
   const order = getOrderById(id);
   if (!order) return undefined;
 
-  // DEMO-SEEDED ISSUE (correctness bug #3): This allows cancelling
-  // orders that are already "delivered" or "cancelled". A real system
-  // should reject those transitions.
+  // DEMO-SEED: BUG-01 — no status-transition guard; delivered/cancelled orders can be re-cancelled
   db.prepare("UPDATE orders SET status = 'cancelled', updatedAt = ? WHERE id = ?").run(
     new Date().toISOString(),
     id

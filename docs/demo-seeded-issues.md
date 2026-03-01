@@ -1,91 +1,62 @@
-# Demo-Seeded Issues — Private Cheat Sheet
+# Demo-Seeded Issues — Presenter Cheat Sheet
 
-> **This file is for the presenter only.** It catalogues all intentionally
-> planted issues in the codebase so you can find, explain, and fix them
-> live during the webinar.  It is NOT linked from the UI or README.
-
----
-
-## Correctness Bugs (3)
-
-### Bug #1 — `riskScoring.ts`: No guard on email split
-- **File:** `backend/src/services/riskScoring.ts` ~line 53
-- **What:** `e.split("@")[1]` will return `undefined` if the email has no `@`, causing `freeProviders.indexOf(undefined)` to silently score incorrectly instead of throwing or handling the edge case.
-- **Demo use:** Show Copilot PR review catching the missing guard.
-
-### Bug #2 — `riskScoring.ts`: Mystery 1.15 multiplier
-- **File:** `backend/src/services/riskScoring.ts` ~line 95
-- **What:** All risk scores are inflated by 15% due to `s = Math.round(s * 1.15)`. There's no documentation on why, and it was "added in a hotfix."
-- **Demo use:** Ask Copilot to explain why the score is inflated — it'll flag the magic number.
-
-### Bug #3 — `orderService.ts`: Can cancel delivered orders
-- **File:** `backend/src/services/orderService.ts` ~line 45
-- **What:** `cancelOrder()` sets status to `'cancelled'` regardless of current status. You can cancel an already-delivered or already-cancelled order.
-- **Demo use:** Show Copilot review pointing out the missing state-machine guard.
+> **Private**. Not linked from the UI, README, or any user-facing page.
+> Use this to locate, explain, and fix each issue during the webinar.
 
 ---
 
-## Performance Issues (3)
+## Correctness Bugs
 
-### Perf #1 — `riskScoring.ts`: `new Date()` on every score call
-- **File:** `backend/src/services/riskScoring.ts` ~line 86
-- **What:** Each `computeRiskScore()` call creates a new `Date` object to check the hour. During seed (520 calls) this is fine, but in a real system scoring thousands of orders in batch, the date should be computed once.
-- **Demo use:** Ask Copilot to suggest performance improvements.
-
-### Perf #2 — `riskScoring.ts`: `batchComputeRiskScores` has no caching
-- **File:** `backend/src/services/riskScoring.ts` ~line 105+
-- **What:** Re-computes every score from scratch on every call. No memoisation, no diffing.
-- **Demo use:** Copilot PR review can flag the O(n) recomputation.
-
-### Perf #3 — `orderService.ts`: Search query not parameterised
-- **File:** `backend/src/services/orderService.ts` ~line 27
-- **What:** The `search` string is interpolated into the SQL. Beyond being a security issue (see Security #1), this also prevents SQLite from caching the prepared statement plan, creating a new plan per-request.
-- **Demo use:** Pair with Security #1 for a "two birds" PR review example.
+| ID | File | Line tag | What a reviewer should notice | Suggested fix |
+|----|------|----------|-------------------------------|---------------|
+| **BUG-01** | `backend/src/services/orderService.ts` | `DEMO-SEED: BUG-01` | `cancelOrder()` sets status to `cancelled` regardless of current status. A delivered or already-cancelled order can be "cancelled" again, silently updating `updatedAt`. | Add a guard: reject cancel when `order.status` is `delivered`, `cancelled`, or `returned`. Return a `409 Conflict`. |
+| **BUG-02** | `backend/src/routes/orders.ts` | `DEMO-SEED: BUG-02` | The `POST /:id/cancel` handler has no `try-catch`. The `GET /` handler has one, but the cancel handler doesn't — an unexpected DB error will crash the Node process with an unhandled exception. | Wrap the body in `try-catch` and return `500` on failure, matching the pattern in the list route. |
+| **BUG-03** | `backend/src/services/riskScoring.ts` | `DEMO-SEED: BUG-03` | `e.split("@")[1]` returns `undefined` for emails without `@`. `freeProviders.indexOf(undefined)` returns `-1`, so malformed emails silently score as "custom domain" (+4 risk). No crash, just wrong data. | Add a guard clause: `const d = e.split("@")[1] ?? ""` or validate email format before scoring. |
 
 ---
 
-## Security Issues (4)
+## Performance Issues
 
-### Sec #1 — SQL Injection in search
-- **File:** `backend/src/services/orderService.ts` ~line 27
-- **What:** The `search` parameter is string-interpolated into the SQL WHERE clause instead of using a parameterised placeholder.  
-  Payload: `?search=' OR 1=1 --`
-- **Demo use:** CodeQL should flag this. Also good for PR review.
+| ID | File | Line tag | What a reviewer should notice | Suggested fix |
+|----|------|----------|-------------------------------|---------------|
+| **PERF-01** | `backend/src/services/orderService.ts` | `DEMO-SEED: PERF-01` | Every page request fires two separate queries — `SELECT COUNT(*)` then `SELECT *`. On a large table this doubles the I/O. | Use `SELECT *, COUNT(*) OVER() AS _total` or a CTE to combine both into one query. |
+| **PERF-02** | `frontend/src/pages/OrdersListPage.tsx` | `DEMO-SEED: PERF-02` | The search `<input>` fires an API request on every keystroke. Typing "keyboard" sends 8 requests in rapid succession. | Debounce the `search` value (e.g., 300 ms) before including it in the `useCallback` dependency array. |
+| **PERF-03** | `frontend/src/components/OrderTable.tsx` | `DEMO-SEED: PERF-03` | `new Date(o.createdAt).toLocaleDateString()` is called inline per row on every render. The inline style objects in `RiskBar` are also re-created each render. | Memoize formatted dates outside JSX; extract static style objects to module scope or use `useMemo`. |
 
-### Sec #2 — Hardcoded API key in source
-- **File:** `backend/src/middleware/auth.ts` ~line 16
-- **What:** `const API_KEY = "sk_live_demo_4f8a2b1c9d3e7f6a0b5c8d2e"` — a credential committed to source. Secret scanning should flag the `sk_live_` prefix pattern.
-- **Demo use:** GitHub secret scanning demo.
+---
 
-### Sec #3 — API key committed to version control
-- **File:** `backend/src/middleware/auth.ts`
-- **What:** Even though the key is fake, committing anything that looks like a credential is a finding. Demonstrates why `.env` + `.gitignore` matter.
-- **Demo use:** Dependency alert / secret scanning demo.
+## Security Issues
 
-### Sec #4 — No rate limiting on auth
-- **File:** `backend/src/middleware/auth.ts` ~line 19
-- **What:** The API key check has no rate limiting or account lockout. An attacker could brute-force the key with unlimited requests.
-- **Demo use:** Copilot PR review or manual discussion point.
+| ID | File | Line tag | What a reviewer should notice | Suggested fix |
+|----|------|----------|-------------------------------|---------------|
+| **SEC-01** | `backend/src/services/orderService.ts` | `DEMO-SEED: SEC-01` | The `search` parameter is string-interpolated into the SQL WHERE clause instead of using a parameterised `?` placeholder. Payload: `?search=' OR 1=1 --` | Use `conditions.push("(customerName LIKE ? OR product LIKE ?)")` with `params.push(\`%${search}%\`, \`%${search}%\`)`. |
+| **SEC-02** | `backend/src/middleware/auth.ts` | `DEMO-SEED: SEC-02` | A credential (`sk_live_demo_…`) is hardcoded in source and committed to version control. Secret scanning should flag the `sk_live_` prefix. | Move to `process.env.API_KEY`, add `.env` to `.gitignore` (already done), provide `.env.example`. |
+| **SEC-03** | `backend/src/routes/orders.ts` | `DEMO-SEED: SEC-03` | The `POST /:id/cancel` endpoint has no authentication middleware. Read routes are intentionally public, but the write operation should require `requireApiKey`. | Apply `requireApiKey` middleware: `router.post("/:id/cancel", requireApiKey, ...)`. |
+| **SEC-04** | `backend/src/routes/orders.ts` | `DEMO-SEED: SEC-04` | On successful cancel, the full order object — including `customerEmail` and `shippingAddress` — is logged to stdout. In production this leaks PII into log aggregators. | Log only `order.id` and `order.status`, or use a structured logger with PII redaction. |
 
 ---
 
 ## Intentionally Missing Test Coverage
 
-| Gap | File | Purpose |
-|-----|------|---------|
-| No test for email without `@` | `tests/riskScoring.test.ts` | Show Copilot generating missing edge-case tests |
-| No test for cancelling a delivered order | `tests/orders.test.ts` | Show Copilot identifying untested state transitions |
-| No test for negative quantity | `tests/riskScoring.test.ts` | Show test generation from Copilot chat |
-| No test for SQL injection | `tests/orders.test.ts` | Show security-focused test generation |
-| No frontend tests at all | `frontend/` | Discuss testing strategy with Copilot |
+| Gap | File | Why it matters |
+|-----|------|----------------|
+| No test for cancelling a delivered order | `tests/orders.test.ts` | Would reveal BUG-01 |
+| No test for SQL injection via search | `tests/orders.test.ts` | Would reveal SEC-01 |
+| No test for email without `@` | `tests/riskScoring.test.ts` | Would reveal BUG-03 |
+| No test for negative quantity or zero price | `tests/riskScoring.test.ts` | Edge-case gaps |
+| No frontend tests at all | `frontend/` | Good discussion point for Copilot test generation |
 
 ---
 
-## How to Use During the Webinar
+## How to Demo Each Issue
 
-1. **PR Review demo:** Create a branch, "fix" one bug, open a PR, and show Copilot review catching the other issues.
-2. **Explain code:** Open `riskScoring.ts` and ask Copilot to explain the nested scoring logic.
-3. **CodeQL demo:** Push to a fork with GitHub Advanced Security enabled — the SQL injection should trigger.
-4. **Secret scanning:** The `sk_live_` prefixed key should trigger a secret scanning alert.
-5. **Docs automation:** Open a PR and watch the `docs-automation.yml` workflow produce a diff summary.
-6. **Test generation:** Ask Copilot to generate the missing edge-case tests listed above.
+| Demo scenario | Issues to highlight |
+|---------------|---------------------|
+| **PR review for bugs** | BUG-01, BUG-02, BUG-03 |
+| **PR review for performance** | PERF-01, PERF-02, PERF-03 |
+| **PR review for security** | SEC-01, SEC-03, SEC-04 |
+| **CodeQL analysis** | SEC-01 (SQL injection) |
+| **Secret scanning** | SEC-02 (`sk_live_` key in source) |
+| **Explain legacy code** | `riskScoring.ts` — nested logic, magic numbers, unclear vars |
+| **Generate missing tests** | All gaps in table above |
+| **Docs automation** | Use the feature branch PR |

@@ -46,6 +46,7 @@ export default function OrdersListPage() {
       <h2 style={{ margin: "1rem 0" }}>Orders</h2>
 
       <div className="controls">
+        {/* DEMO-SEED: PERF-02 — fires API request on every keystroke, no debounce */}
         <input
           type="text"
           placeholder="Search customer or product…"

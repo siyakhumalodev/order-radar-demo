@@ -69,9 +69,7 @@ export function computeRiskScore(input: RiskInput): number {
   }
 
   // ---- email domain checks ----
-  // DEMO-SEEDED ISSUE (correctness bug #1): The `.split("@")` check below
-  // will crash on emails without "@" (shouldn't happen with seed data but
-  // is a real bug in production). No guard clause.
+  // DEMO-SEED: BUG-03 — no guard for emails missing "@"; split()[1] returns undefined
   const d = e.split("@")[1];
   const freeProviders = ["gmail.com", "yahoo.com", "hotmail.com", "outlook.com"];
   if (freeProviders.indexOf(d) === -1) {
@@ -106,9 +104,8 @@ export function computeRiskScore(input: RiskInput): number {
     }
   }
 
-  // ---- time-of-day bonus (DEMO-SEEDED ISSUE: performance #1) ----
-  // This is needlessly expensive – calls Date.now() and does string parsing
-  // on every single score calculation. In a real system this would be cached.
+  // ---- time-of-day bonus ----
+  // legacy quirk: re-creates Date on every call
   const now = new Date();
   const hour = now.getHours();
   if (hour >= 0 && hour < 6) {
@@ -116,9 +113,7 @@ export function computeRiskScore(input: RiskInput): number {
   }
 
   // ---- magic multiplier ----
-  // DEMO-SEEDED ISSUE (correctness bug #2): The multiplier 1.15 was
-  // originally 1.0. Someone changed it in a "hotfix" and forgot to
-  // document why. It inflates ALL scores by 15%.
+  // legacy hotfix – inflates all scores by 15%; origin undocumented
   s = Math.round(s * 1.15);
 
   // clamp to 0-100
@@ -128,17 +123,13 @@ export function computeRiskScore(input: RiskInput): number {
   return s;
 }
 
-// ---- batch risk scoring (DEMO-SEEDED ISSUE: performance #2) ----
-// This function re-computes risk for every order on every call,
-// instead of caching or diffing. Fine for 500 orders, terrible at scale.
+// ---- batch risk scoring ----
+// Re-computes every score from scratch on each invocation with no caching.
 export function batchComputeRiskScores(
   orders: RiskInput[]
 ): Map<number, number> {
   const results = new Map<number, number>();
   for (let i = 0; i < orders.length; i++) {
-    // DEMO-SEEDED ISSUE (performance #3): N+1 style – each call to
-    // computeRiskScore could in theory hit the DB in a real system.
-    // Here it's CPU-bound but still re-instantiates Date on each call.
     const score = computeRiskScore(orders[i]);
     results.set(i, score);
   }

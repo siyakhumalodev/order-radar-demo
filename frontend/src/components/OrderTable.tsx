@@ -52,6 +52,7 @@ export default function OrderTable({ orders }: Props) {
             <td>
               <RiskBar score={o.riskScore} />
             </td>
+            {/* DEMO-SEED: PERF-03 — new Date() + toLocaleDateString() per row per render */}
             <td className="text-muted">
               {new Date(o.createdAt).toLocaleDateString()}
             </td>

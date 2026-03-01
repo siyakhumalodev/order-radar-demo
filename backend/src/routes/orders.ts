@@ -1,9 +1,9 @@
 import { Router, Request, Response } from "express";
-import { v4 as uuid } from "uuid";
 import {
   listOrders,
   getOrderById,
   cancelOrder,
+  StatusTransitionError,
 } from "../services/orderService.js";
 
 const router = Router();
@@ -36,18 +36,28 @@ router.get("/:id", (req: Request, res: Response) => {
 
 // POST /api/orders/:id/cancel
 // DEMO-SEED: SEC-03 — write operation has no authentication middleware
-// DEMO-SEED: BUG-02 — no try-catch; unexpected DB errors crash the process
 router.post("/:id/cancel", (req: Request, res: Response) => {
-  const order = cancelOrder(req.params.id);
-  if (!order) {
-    res.status(404).json({ error: "Order not found" });
-    return;
+  try {
+    const { reason } = req.body ?? {};
+    const result = cancelOrder(req.params.id, reason);
+
+    if (!result) {
+      res.status(404).json({ error: "Order not found" });
+      return;
+    }
+
+    // DEMO-SEED: SEC-04 — logs full order object including customer PII
+    console.log("Order cancelled:", JSON.stringify(result.order));
+
+    res.json(result);
+  } catch (err) {
+    if (err instanceof StatusTransitionError) {
+      res.status(409).json({ error: err.message });
+      return;
+    }
+    console.error("Error cancelling order:", err);
+    res.status(500).json({ error: "Internal server error" });
   }
-
-  // DEMO-SEED: SEC-04 — logs full order object including customer PII
-  console.log("Order cancelled:", JSON.stringify(order));
-
-  res.json(order);
 });
 
 export default router;

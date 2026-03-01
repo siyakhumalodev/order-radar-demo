@@ -19,9 +19,9 @@ export default function OrderDetailPage() {
       .catch(() => setError("Order not found"));
   }, [id]);
 
-  const handleCancel = async () => {
+  const handleCancel = async (reason: string) => {
     if (!id) return;
-    const updated = await apiCancel(id);
+    const updated = await apiCancel(id, reason);
     setOrder(updated);
     setShowCancel(false);
   };

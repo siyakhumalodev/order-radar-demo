@@ -1,0 +1,68 @@
+name: Docs Automation
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  generate-pr-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # ────────────────────────────────────────────
+      # Copilot CLI placeholder commands
+      #
+      # In a real setup you would install @githubnext/github-copilot-cli
+      # and use `github-copilot-cli` commands.  For this demo we use
+      # placeholder scripts that illustrate the *workflow shape*.
+      # ────────────────────────────────────────────
+
+      - name: Generate PR summary with Copilot CLI (placeholder)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "── Copilot CLI: generate PR description ──"
+          echo "This step would run:"
+          echo "  copilot-cli summarize-pr --diff \$(git diff origin/main...HEAD)"
+          echo ""
+          echo "For now, generating a basic diff stat:"
+          echo '```' > /tmp/pr-summary.md
+          git diff --stat origin/main...HEAD >> /tmp/pr-summary.md
+          echo '```' >> /tmp/pr-summary.md
+          cat /tmp/pr-summary.md
+
+      - name: Generate changelog entry (placeholder)
+        run: |
+          echo "── Copilot CLI: generate changelog ──"
+          echo "This step would run:"
+          echo "  copilot-cli generate-changelog --since last-release"
+          echo ""
+          TIMESTAMP=$(date -u +"%Y-%m-%d")
+          echo "## [$TIMESTAMP] - Auto-generated" > /tmp/changelog-entry.md
+          echo "" >> /tmp/changelog-entry.md
+          git log --oneline origin/main...HEAD >> /tmp/changelog-entry.md
+          cat /tmp/changelog-entry.md
+
+      - name: Post summary as PR comment
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Would post the following to PR #${{ github.event.pull_request.number }}:"
+          cat /tmp/pr-summary.md
+          # Uncomment below to actually post:
+          # gh pr comment ${{ github.event.pull_request.number }} \
+          #   --body-file /tmp/pr-summary.md

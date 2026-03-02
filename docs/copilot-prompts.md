@@ -1,29 +1,44 @@
-# Copilot Prompt Playbook — Webinar Edition
+# Copilot Prompt Playbook — Webinar Demo Script
 
-> **Audience:** Webinar presenter and attendees.
-> Each prompt is designed for use with the `order-radar-demo` repository.
-> Prompts are written for GitHub Copilot Chat, Copilot PR review, or Copilot CLI — noted per section.
+> **For:** Webinar presenter. Follow the numbered steps in order.
+> Each step has a **Setup** (what to do/show), a **Prompt** (copy-paste into Copilot), and **Talking Points** (what to tell the audience).
+> All prompts target the `order-radar-demo` repository on branch `feature/cancel-order-with-reason-and-ops-note` compared to `develop`.
+
+---
+
+## Pre-Demo Checklist
+
+- [ ] Clone the repo and check out branch `feature/cancel-order-with-reason-and-ops-note`
+- [ ] Run `npm run install:all` to install all dependencies
+- [ ] Run `npm run dev` and confirm both servers start (frontend :5173, backend :3001)
+- [ ] Open the repo in VS Code with the GitHub Copilot extension installed
+- [ ] Open a browser tab to the GitHub PR creation page (or an existing PR for this branch → `develop`)
+- [ ] Have `docs/demo-seeded-issues.md` open in a separate tab as your cheat sheet
 
 ---
 
 ## Table of Contents
 
-1. [PR Description Generation](#1-pr-description-generation)
-2. [PR Review — Correctness Pass](#2-pr-review--correctness-pass)
-3. [PR Review — Performance Pass](#3-pr-review--performance-pass)
-4. [PR Review — Security Pass](#4-pr-review--security-pass)
-5. [Explain Complex Diff in 3 Layers](#5-explain-complex-diff-in-3-layers)
-6. [Generate Regression Tests from Diff](#6-generate-regression-tests-from-diff)
-7. [Docs Automation (Release Notes + API Docs Delta)](#7-docs-automation-release-notes--api-docs-delta)
-8. [Explain a CodeQL Alert and Propose Fix](#8-explain-a-codeql-alert-and-propose-fix)
+1. [PR Description Generation](#step-1--pr-description-generation)
+2. [PR Review — Correctness Pass](#step-2--pr-review--correctness-pass)
+3. [PR Review — Performance Pass](#step-3--pr-review--performance-pass)
+4. [PR Review — Security Pass](#step-4--pr-review--security-pass)
+5. [Explain Complex Code in 3 Layers](#step-5--explain-complex-code-in-3-layers)
+6. [Generate Regression Tests from Diff](#step-6--generate-regression-tests-from-diff)
+7. [Docs Automation (Release Notes + API Docs Delta)](#step-7--docs-automation-release-notes--api-docs-delta)
+8. [Explain a CodeQL Alert and Propose Fix](#step-8--explain-a-codeql-alert-and-propose-fix)
+9. [Prompt Engineering Principles — Quick Reference](#prompt-engineering-principles--quick-reference)
 
 ---
 
-## 1. PR Description Generation
+## Step 1 — PR Description Generation
 
-**Use with:** Copilot Chat in PR creation view, or paste into Copilot Chat with the diff attached.
+### Setup
 
-### The Prompt
+1. Open the GitHub PR creation page for `feature/cancel-order-with-reason-and-ops-note` → `develop`.
+2. Open Copilot Chat in the PR creation view (or in VS Code with the diff context).
+
+### Prompt (copy-paste)
 
 ```
 You are a senior engineer writing a pull request description for human reviewers.
@@ -55,49 +70,28 @@ Constraints:
 - If a file is renamed or deleted, say so explicitly.
 ```
 
-### Why It Works
+### What to expect
 
-| Technique | What it does |
-|-----------|-------------|
-| **Role assignment** | "senior engineer writing a PR description" anchors the tone — professional, concise, reviewer-oriented. |
-| **Explicit section headings** | Forces structured output. Without them, Copilot tends to emit a wall of text. |
-| **Grouping instruction** | "grouped by area (backend, frontend, tests, config)" prevents a flat list of 12 files with no organisation. |
-| **Negative constraint** | "Do NOT invent changes" prevents hallucination — LLMs will sometimes pad summaries with plausible but nonexistent changes. |
-| **Character limit per bullet** | Keeps bullets scannable on GitHub's PR page. |
-| **"How to Test" section** | Reviewers routinely skip PRs that don't explain verification. The prompt forces it. |
-| **"Risks" section** | Trains the model to surface what it's uncertain about rather than hiding it. |
+Copilot should produce a structured PR description with 4 sections. Look for:
+- **Summary** mentioning the optional `reason` field and ops-note auto-creation.
+- **Changes** grouped under Backend / Frontend / Tests headings.
+- **How to Test** including a `curl` command to cancel with a reason.
+- **Risks** — it may flag missing `docs/api.md` updates or the `customerEmail` as author issue.
 
-### Expected Output Structure
+### Talking points
 
-```markdown
-## Summary
-Adds an optional `reason` field to the cancel-order endpoint. When provided,
-the backend auto-generates an ops note attached to the order…
+- **Role assignment** ("senior engineer writing a PR description") anchors the tone.
+- **Explicit section headings** force structured output instead of a wall of text.
+- **"Do NOT invent changes"** prevents hallucination — LLMs sometimes pad summaries with plausible but nonexistent changes.
+- **"Risks" section** trains the model to self-audit instead of hiding uncertainty.
 
-## Changes
-**Backend**
-- `backend/src/services/orderService.ts` → Accepts `reason` param, creates ops note on cancel
-- `backend/src/routes/orders.ts` → Passes `reason` from request body, adds try-catch
-- `backend/src/types.ts` → Adds `CancelOrderRequest` interface
-…
+### Weak version (show for contrast)
 
-## How to Test
-1. Start the dev server: `npm run dev`
-2. Cancel an order with reason:
-   ```bash
-   curl -X POST http://localhost:3001/api/orders/<id>/cancel \
-     -H "Content-Type: application/json" \
-     -d '{"reason":"Customer requested"}'
-   ```
-3. Verify the response contains `{ order: {...}, note: {...} }`
-…
-
-## Risks & Open Questions
-- The ops note uses `order.customerEmail` as the `author` field — should this be `"system"` instead?
-- `docs/api.md` is not updated to reflect the new `reason` field.
+```
+Summarize this PR.
 ```
 
-### Weak Version (to demonstrate)
+Why it's weak: no role, no output structure, no constraints, no reviewer focus. The result reads like a commit message, not a PR description.
 
 ```
 Summarize this PR.

@@ -54,10 +54,25 @@ export function getOrderById(id: string): Order | undefined {
     | undefined;
 }
 
-// DEMO-SEED: BUG-01 — no status guard; delivered/cancelled orders can be cancelled again
+/**
+ * Thrown when an order is in a terminal status and cannot be cancelled.
+ */
+export class StatusTransitionError extends Error {
+  public readonly currentStatus: string;
+  constructor(status: string) {
+    super(`Cannot cancel order in "${status}" status`);
+    this.name = "StatusTransitionError";
+    this.currentStatus = status;
+  }
+}
+
 export function cancelOrder(id: string, reason?: string): { order: Order; note?: OrderNote } | undefined {
   const order = getOrderById(id);
   if (!order) return undefined;
+
+  if (TERMINAL_STATUSES.has(order.status)) {
+    throw new StatusTransitionError(order.status);
+  }
 
   const now = new Date().toISOString();
 
@@ -73,18 +88,6 @@ export function cancelOrder(id: string, reason?: string): { order: Order; note?:
   }
 
   return { order: getOrderById(id)!, note: opsNote };
-}
-
-/**
- * Thrown when an order is in a terminal status and cannot be cancelled.
- */
-export class StatusTransitionError extends Error {
-  public readonly currentStatus: string;
-  constructor(status: string) {
-    super(`Cannot cancel order in "${status}" status`);
-    this.name = "StatusTransitionError";
-    this.currentStatus = status;
-  }
 }
 
 export function getNotesForOrder(orderId: string): OrderNote[] {

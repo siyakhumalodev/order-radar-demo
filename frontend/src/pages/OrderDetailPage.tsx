@@ -11,6 +11,7 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [showCancel, setShowCancel] = useState(false);
   const [error, setError] = useState("");
+  const [cancelError, setCancelError] = useState("");
 
   useEffect(() => {
     if (!id) return;
@@ -21,10 +22,18 @@ export default function OrderDetailPage() {
 
   const handleCancel = async (reason: string) => {
     if (!id) return;
-    const updated = await apiCancel(id, reason);
-    setOrder(updated);
-    setShowCancel(false);
+    try {
+      const updated = await apiCancel(id, reason);
+      setOrder(updated);
+      setShowCancel(false);
+    } catch (err) {
+      console.error("Failed to cancel order", err);
+      setCancelError("Failed to cancel order. Please try again.");
+      setShowCancel(false);
+    }
   };
+
+  const handleCancelClick = () => { setCancelError(""); setShowCancel(true); };
 
   if (error) {
     return (
@@ -104,12 +113,19 @@ export default function OrderDetailPage() {
       </div>
 
       {order.status !== "cancelled" && (
-        <button
-          className="btn-danger mt-1"
-          onClick={() => setShowCancel(true)}
-        >
-          Cancel Order
-        </button>
+        <>
+          {cancelError && (
+            <p className="mt-1" style={{ color: "red", fontSize: "0.875rem" }}>
+              {cancelError}
+            </p>
+          )}
+          <button
+            className="btn-danger mt-1"
+            onClick={handleCancelClick}
+          >
+            Cancel Order
+          </button>
+        </>
       )}
 
       {showCancel && (

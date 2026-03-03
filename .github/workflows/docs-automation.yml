@@ -88,38 +88,65 @@ jobs:
         id: generate-changelog
         env:
           GH_TOKEN: ${{ secrets.MODELS_TOKEN }}
+          PR_TITLE: ${{ steps.pr-info.outputs.title }}
+          PR_BODY: ${{ steps.pr-info.outputs.body }}
+          PR_COMMITS: ${{ steps.pr-info.outputs.commits }}
+          PR_URL: ${{ steps.pr-info.outputs.pr_url }}
+          DIFF_SUMMARY: ${{ steps.diff.outputs.diff_summary }}
+          CURRENT_CHANGELOG: ${{ steps.current-changelog.outputs.current_changelog }}
         run: |
-          cat > analysis_prompt.txt << 'PROMPT_END'
-          You are a technical documentation expert specialising in changelogs that follow the Keep a Changelog (https://keepachangelog.com) convention.
+          # Write each dynamic value to a file to prevent heredoc injection
+          printf '%s' "$PR_TITLE" > /tmp/pr_title.txt
+          printf '%s' "$PR_BODY" > /tmp/pr_body.txt
+          printf '%s' "$PR_COMMITS" > /tmp/pr_commits.txt
+          printf '%s' "$PR_URL" > /tmp/pr_url.txt
+          printf '%s' "$DIFF_SUMMARY" > /tmp/diff_summary.txt
+          printf '%s' "$CURRENT_CHANGELOG" > /tmp/current_changelog.txt
 
-          Analyze the following pull request and produce an updated CHANGELOG.md.
+          # Build the prompt by concatenating static sections with dynamic file content
+          {
+            cat << 'STATIC_HEADER'
+You are a technical documentation expert specialising in changelogs that follow the Keep a Changelog (https://keepachangelog.com) convention.
 
-          ## Pull Request Information
-          Title: ${{ steps.pr-info.outputs.title }}
-          Description: ${{ steps.pr-info.outputs.body }}
-          PR Link: ${{ steps.pr-info.outputs.pr_url }}
+Analyze the following pull request and produce an updated CHANGELOG.md.
 
-          ## Commit Messages
-          ${{ steps.pr-info.outputs.commits }}
+## Pull Request Information
+Title: STATIC_HEADER
+            cat /tmp/pr_title.txt
+            printf '\nDescription: '
+            cat /tmp/pr_body.txt
+            printf '\nPR Link: '
+            cat /tmp/pr_url.txt
+            cat << 'STATIC_COMMITS'
 
-          ## Code Changes (Diff)
-          ${{ steps.diff.outputs.diff_summary }}
+## Commit Messages
+STATIC_COMMITS
+            cat /tmp/pr_commits.txt
+            cat << 'STATIC_DIFF'
 
-          ## Current CHANGELOG.md Content
-          ${{ steps.current-changelog.outputs.current_changelog }}
+## Code Changes (Diff)
+STATIC_DIFF
+            cat /tmp/diff_summary.txt
+            cat << 'STATIC_CHANGELOG'
 
-          ## Instructions
-          1. Analyze the code changes to understand what was added, changed, deprecated, removed, fixed, or secured.
-          2. Add a new entry at the TOP of the changelog (below the main heading) for this PR.
-             - Use today's date and the PR title as the section heading.
-             - Include a markdown link to the PR, e.g. ([#<number>](<pr_url>)).
-             - Categorise items under sub-headings: Added, Changed, Deprecated, Removed, Fixed, Security (omit empty categories).
-          3. Preserve all existing changelog entries below the new one.
-          4. If no meaningful changes exist, output "NO_CHANGES_NEEDED".
+## Current CHANGELOG.md Content
+STATIC_CHANGELOG
+            cat /tmp/current_changelog.txt
+            cat << 'STATIC_FOOTER'
 
-          Output ONLY the complete updated CHANGELOG.md content (or "NO_CHANGES_NEEDED").
-          Do not include any explanations, just the raw markdown content.
-          PROMPT_END
+## Instructions
+1. Analyze the code changes to understand what was added, changed, deprecated, removed, fixed, or secured.
+2. Add a new entry at the TOP of the changelog (below the main heading) for this PR.
+   - Use today's date and the PR title as the section heading.
+   - Include a markdown link to the PR, e.g. ([#<number>](<pr_url>)).
+   - Categorise items under sub-headings: Added, Changed, Deprecated, Removed, Fixed, Security (omit empty categories).
+3. Preserve all existing changelog entries below the new one.
+4. If no meaningful changes exist, output "NO_CHANGES_NEEDED".
+
+Output ONLY the complete updated CHANGELOG.md content (or "NO_CHANGES_NEEDED").
+Do not include any explanations, just the raw markdown content.
+STATIC_FOOTER
+          } > analysis_prompt.txt
 
           cat analysis_prompt.txt | gh models run openai/gpt-4.1 > generated_changelog.md
 

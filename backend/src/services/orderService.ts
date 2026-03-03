@@ -81,13 +81,16 @@ export function cancelOrder(id: string, reason?: string): { order: Order; note?:
     id
   );
 
+  // Build the updated order from the known mutations — avoids a second SELECT
+  const cancelledOrder: Order = { ...order, status: "cancelled", updatedAt: now };
+
   // Auto-create an ops note when cancelling
   let opsNote: OrderNote | undefined;
   if (reason) {
     opsNote = addNoteToOrder(id, uuid(), order.customerEmail, `Order cancelled: ${reason}`);
   }
 
-  return { order: getOrderById(id)!, note: opsNote };
+  return { order: cancelledOrder, note: opsNote };
 }
 
 export function getNotesForOrder(orderId: string): OrderNote[] {

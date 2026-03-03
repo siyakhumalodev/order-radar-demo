@@ -91,11 +91,18 @@ describe("orderService", () => {
     });
 
     it("throws StatusTransitionError for already-cancelled orders", () => {
-      // Use an order we already cancelled above
-      const cancelled = listOrders(1, 100, "cancelled");
-      if (cancelled.data.length === 0) return;
+      // Self-contained: cancel an order here, then attempt a second cancel
+      const pending = listOrders(1, 100, "pending");
+      const processing = listOrders(1, 100, "processing");
+      const sourceList = pending.data.length > 0 ? pending : processing;
+      if (!sourceList || sourceList.data.length === 0) return;
 
-      expect(() => cancelOrder(cancelled.data[0].id)).toThrow(StatusTransitionError);
+      const orderId = sourceList.data[0].id;
+      const firstResult = cancelOrder(orderId);
+      expect(firstResult).toBeDefined();
+      expect(firstResult!.order.status).toBe("cancelled");
+
+      expect(() => cancelOrder(orderId)).toThrow(StatusTransitionError);
     });
 
     // INTENTIONALLY MISSING: test that cancelling a "delivered" order should fail

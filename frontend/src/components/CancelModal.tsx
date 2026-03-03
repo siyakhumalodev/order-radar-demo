@@ -3,7 +3,7 @@ import type { Order } from "../types";
 
 interface Props {
   order: Order;
-  onConfirm: (reason: string) => void;
+  onConfirm: (reason: string) => Promise<void>;
   onClose: () => void;
 }
 
@@ -13,8 +13,11 @@ export default function CancelModal({ order, onConfirm, onClose }: Props) {
 
   const handleConfirm = async () => {
     setConfirming(true);
-    await onConfirm(reason);
-    setConfirming(false);
+    try {
+      await onConfirm(reason);
+    } finally {
+      setConfirming(false);
+    }
   };
 
   return (

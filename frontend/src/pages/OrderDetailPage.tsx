@@ -21,9 +21,15 @@ export default function OrderDetailPage() {
 
   const handleCancel = async (reason: string) => {
     if (!id) return;
-    const updated = await apiCancel(id, reason);
-    setOrder(updated);
-    setShowCancel(false);
+    try {
+      const updated = await apiCancel(id, reason);
+      setOrder(updated);
+      setShowCancel(false);
+    } catch (err) {
+      console.error("Failed to cancel order", err);
+      setError("Failed to cancel order. Please try again.");
+      throw err;
+    }
   };
 
   if (error) {

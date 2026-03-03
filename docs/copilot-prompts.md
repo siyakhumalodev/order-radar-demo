@@ -19,26 +19,28 @@
 
 ## Table of Contents
 
-1. [PR Description Generation](#step-1--pr-description-generation)
-2. [PR Review — Correctness Pass](#step-2--pr-review--correctness-pass)
-3. [PR Review — Performance Pass](#step-3--pr-review--performance-pass)
-4. [PR Review — Security Pass](#step-4--pr-review--security-pass)
-5. [Explain Complex Code in 3 Layers](#step-5--explain-complex-code-in-3-layers)
-6. [Generate Regression Tests from Diff](#step-6--generate-regression-tests-from-diff)
-7. [Docs Automation (Release Notes + API Docs Delta)](#step-7--docs-automation-release-notes--api-docs-delta)
-8. [Explain a CodeQL Alert and Propose Fix](#step-8--explain-a-codeql-alert-and-propose-fix)
-9. [Prompt Engineering Principles — Quick Reference](#prompt-engineering-principles--quick-reference)
+| Step | Topic | Time Est. |
+|------|-------|-----------|
+| [1](#step-1--pr-description-generation) | PR Description Generation | 5 min |
+| [2](#step-2--pr-review--correctness-pass) | PR Review — Correctness Pass | 5 min |
+| [3](#step-3--pr-review--performance-pass) | PR Review — Performance Pass | 5 min |
+| [4](#step-4--pr-review--security-pass) | PR Review — Security Pass | 5 min |
+| [5](#step-5--explain-complex-code-in-3-layers) | Explain Complex Code in 3 Layers | 5 min |
+| [6](#step-6--generate-regression-tests-from-diff) | Generate Regression Tests from Diff | 5 min |
+| [7](#step-7--docs-automation-release-notes--api-docs-delta) | Docs Automation (Release Notes + API Docs Delta) | 5 min |
+| [8](#step-8--explain-a-codeql-alert-and-propose-fix) | Explain a CodeQL Alert and Propose Fix | 5 min |
+| [Ref](#prompt-engineering-principles--quick-reference) | Prompt Engineering Principles — Quick Reference | — |
 
 ---
 
 ## Step 1 — PR Description Generation
 
-### Setup
+### 1.1 Setup
 
 1. Open the GitHub PR creation page for `feature/cancel-order-with-reason-and-ops-note` → `develop`.
 2. Open Copilot Chat in the PR creation view (or in VS Code with the diff context).
 
-### Prompt (copy-paste)
+### 1.2 Prompt (copy-paste)
 
 ```
 You are a senior engineer writing a pull request description for human reviewers.
@@ -70,22 +72,26 @@ Constraints:
 - If a file is renamed or deleted, say so explicitly.
 ```
 
-### What to expect
+### 1.3 What to expect
 
 Copilot should produce a structured PR description with 4 sections. Look for:
-- **Summary** mentioning the optional `reason` field and ops-note auto-creation.
-- **Changes** grouped under Backend / Frontend / Tests headings.
-- **How to Test** including a `curl` command to cancel with a reason.
-- **Risks** — it may flag missing `docs/api.md` updates or the `customerEmail` as author issue.
 
-### Talking points
+- **Summary** — mentions the optional `reason` field and ops-note auto-creation.
+- **Changes** — grouped under Backend / Frontend / Tests headings.
+- **How to Test** — includes a `curl` command to cancel with a reason.
+- **Risks** — may flag missing `docs/api.md` updates or the `customerEmail`-as-author issue.
 
-- **Role assignment** ("senior engineer writing a PR description") anchors the tone.
-- **Explicit section headings** force structured output instead of a wall of text.
-- **"Do NOT invent changes"** prevents hallucination — LLMs sometimes pad summaries with plausible but nonexistent changes.
-- **"Risks" section** trains the model to self-audit instead of hiding uncertainty.
+### 1.4 Talking points
 
-### Weak version (show for contrast)
+| Technique | Why it matters |
+|-----------|----------------|
+| **Role assignment** | "senior engineer writing a PR description" anchors tone — professional, concise, reviewer-oriented. |
+| **Explicit section headings** | Forces structured output. Without them, Copilot returns a wall of text. |
+| **Grouping instruction** | "grouped by area" prevents a flat list of 12 files with no organisation. |
+| **Negative constraint** | "Do NOT invent changes" prevents hallucination. |
+| **"Risks" section** | Trains the model to self-audit rather than hiding uncertainty. |
+
+### 1.5 Weak version (show for contrast)
 
 ```
 Summarize this PR.
@@ -93,27 +99,18 @@ Summarize this PR.
 
 Why it's weak: no role, no output structure, no constraints, no reviewer focus. The result reads like a commit message, not a PR description.
 
-```
-Summarize this PR.
-```
-
-**Why it's weak:**
-- No role → generic tone
-- No output structure → unpredictable formatting
-- No constraints → may hallucinate changes
-- No reviewer focus → reads like a commit message, not a PR description
-
-### Improved Version (shown above)
-
-The full prompt adds: role, exact section headings, grouping rules, negative constraints, output format, and a "Risks" section that encourages the model to self-audit.
-
 ---
 
-## 2. PR Review — Correctness Pass
+## Step 2 — PR Review — Correctness Pass
 
-**Use with:** Copilot PR review, or Copilot Chat with specific files attached.
+### 2.1 Setup
 
-### The Prompt
+1. Open the PR for this branch on GitHub, or open Copilot Chat in VS Code.
+2. Attach the changed files to the conversation (or use the PR review context).
+
+> **Cheat sheet:** This prompt should find **BUG-01** (cancel without status guard), **BUG-02** (missing try-catch), and **BUG-03** (email without `@`). See `docs/demo-seeded-issues.md`.
+
+### 2.2 Prompt (copy-paste)
 
 ```
 You are a senior backend engineer performing a correctness-only code review.
@@ -134,62 +131,44 @@ Ignore performance, style, naming, and security — those are separate passes.
 Do not comment on code that is correct. Only flag real bugs.
 ```
 
-### Why It Works
+### 2.3 What to expect
 
-| Technique | What it does |
-|-----------|-------------|
-| **Single-pass scoping** | "correctness-only" prevents Copilot from diluting findings across 4 categories. Focused passes find more issues per category. |
-| **Numbered checklist** | The 4 sub-categories (logic, state machine, error handling, data integrity) act as a mental framework the model follows sequentially. |
-| **Structured output per finding** | Prevents vague comments like "this might be a problem." Forces file, line, description, severity, and fix. |
-| **Severity emoji scale** | Gives reviewers instant visual triage. Without it, every finding reads as equal. |
-| **Negative scoping** | "Ignore performance, style, naming, and security" prevents comment noise and keeps the pass focused. |
+| Seeded Issue | What Copilot should find |
+|--------------|--------------------------|
+| **BUG-01** | `cancelOrder()` sets status to `cancelled` regardless of current status — delivered/cancelled orders can be cancelled again. |
+| **BUG-02** | `POST /:id/cancel` handler has no `try-catch` — an unexpected DB error crashes the Node process. |
+| **BUG-03** | `e.split("@")[1]` returns `undefined` for emails without `@` — malformed emails silently score as "custom domain" (+4 risk). |
+
+### 2.4 Talking points
+
+| Technique | Why it matters |
+|-----------|----------------|
+| **Single-pass scoping** | "correctness-only" prevents diluting findings across categories. Focused passes find **more** per category. |
+| **Numbered checklist** | The 4 sub-categories act as a mental framework the model follows sequentially. |
+| **Severity emoji scale** | Gives reviewers instant visual triage — without it every finding reads as equal. |
 | **"Only flag real bugs"** | Suppresses the model's tendency to pad output with nits to appear thorough. |
+| **Negative scoping** | "Ignore performance, style, naming, and security" prevents comment noise. |
 
-### Expected Output Structure
-
-```markdown
-### 🔴 Bug — `backend/src/services/orderService.ts` L76
-
-**Issue:** `addNoteToOrder` uses `order.customerEmail` as the `author` parameter.
-Ops notes should be attributed to `"system"` or the authenticated user, not the
-customer's email.
-
-**Suggested fix:**
-```ts
-opsNote = addNoteToOrder(id, uuid(), "system", `Order cancelled: ${reason}`);
-```
-
----
-
-### 🟡 Issue — `backend/src/services/riskScoring.ts` L74
-
-**Issue:** `e.split("@")[1]` returns `undefined` when the email contains no `@`.
-…
-```
-
-### Weak Version
+### 2.5 Weak version (show for contrast)
 
 ```
 Review this code for bugs.
 ```
 
-**Why it's weak:**
-- No role → Copilot defaults to "helpful assistant" tone instead of "experienced reviewer"
-- "Bugs" is unbounded → mixes style nits, perf opinions, and security concerns
-- No output structure → findings are unstructured paragraphs
-- No severity → no way to triage
-
-### Improved Version
-
-The full prompt above. The key upgrades: single-category scoping, checklist of sub-categories, per-finding output schema with severity, and explicit exclusions.
+Why it's weak: "bugs" is unbounded (mixes style/perf/security), no output structure, no severity scale, no role.
 
 ---
 
-## 3. PR Review — Performance Pass
+## Step 3 — PR Review — Performance Pass
 
-**Use with:** Copilot PR review, or Copilot Chat with files attached.
+### 3.1 Setup
 
-### The Prompt
+1. Stay in the same PR or Copilot Chat session.
+2. Start a **new conversation** so findings don't bleed between passes.
+
+> **Cheat sheet:** This prompt should find **PERF-01** (double query), **PERF-02** (search debounce), and **PERF-03** (inline allocations in render). See `docs/demo-seeded-issues.md`.
+
+### 3.2 Prompt (copy-paste)
 
 ```
 You are a performance-focused reviewer for a Node.js + React application.
@@ -210,67 +189,43 @@ For each finding:
 Ignore correctness, security, and style. Only flag performance issues.
 ```
 
-### Why It Works
+### 3.3 What to expect
 
-| Technique | What it does |
-|-----------|-------------|
-| **Tech stack declaration** | "Node.js + React" gives the model the right perf heuristics — it won't suggest Java-specific patterns. |
-| **4-category checklist** | Covers backend I/O, caching, frontend rendering, and algorithms — the 4 most common performance problem families. |
-| **"Impact" field** | Forces the model to quantify: "8 API calls per search" is actionable; "this could be slow" is not. |
-| **"Concrete code change"** | Prevents recommendations like "consider using memoization" without showing how. |
-| **Exclusion clause** | Keeps the pass clean — no correctness or security comments leaking in. |
+| Seeded Issue | What Copilot should find |
+|--------------|--------------------------|
+| **PERF-01** | Two separate queries per page (COUNT then SELECT). On large datasets, doubles I/O. |
+| **PERF-02** | Search `<input>` fires an API request on every keystroke — typing "keyboard" sends 8 requests. |
+| **PERF-03** | `new Date().toLocaleDateString()` called inline per row per render; inline style objects re-created each render. |
 
-### Expected Output Structure
+### 3.4 Talking points
 
-```markdown
-### 🔴 Measurable — `frontend/src/pages/OrdersListPage.tsx` L42
+| Technique | Why it matters |
+|-----------|----------------|
+| **Tech stack declaration** | "Node.js + React" gives the model the right perf heuristics — it won't suggest Java patterns. |
+| **4-category checklist** | Covers backend I/O, caching, frontend rendering, and algorithms — the top perf problem families. |
+| **"Impact" field** | Forces quantification: "8 API calls per search" is actionable; "this could be slow" is not. |
+| **"Concrete code change"** | Prevents vague "consider using memoization" recommendations. |
 
-**Impact:** Every keystroke in the search box triggers a full API request. Typing
-a 6-character query fires 6 sequential network requests.
-
-**Fix:**
-```tsx
-const [rawSearch, setRawSearch] = useState("");
-const debouncedSearch = useDebounce(rawSearch, 300);
-// use debouncedSearch in the fetch effect instead of rawSearch
-```
-
----
-
-### 🟡 At scale — `backend/src/services/orderService.ts` L32-44
-
-**Impact:** Two separate SQLite queries per page load (COUNT then SELECT).
-On 520 rows this is trivial; on 500 k rows the double scan is measurable.
-
-**Fix:**
-```sql
-SELECT *, COUNT(*) OVER() AS _total FROM orders WHERE … LIMIT ? OFFSET ?
-```
-```
-
-### Weak Version
+### 3.5 Weak version (show for contrast)
 
 ```
 Are there any performance issues in this code?
 ```
 
-**Why it's weak:**
-- Yes/no question invites a one-word answer
-- No checklist → model picks whatever comes to mind first
-- No output structure → paragraph of general advice
-- No severity → "micro-optimization" and "production bottleneck" treated equally
-
-### Improved Version
-
-The full prompt above. Key upgrades: scoped review, tech-stack context, 4-category framework, quantified impact, severity scale, and concrete code fixes.
+Why it's weak: yes/no question invites a one-word answer, no checklist, no output structure, no severity.
 
 ---
 
-## 4. PR Review — Security Pass
+## Step 4 — PR Review — Security Pass
 
-**Use with:** Copilot PR review, or Copilot Chat with files attached.
+### 4.1 Setup
 
-### The Prompt
+1. Start a **new conversation** in Copilot Chat.
+2. Attach the changed files or use the PR context.
+
+> **Cheat sheet:** This prompt should find **SEC-01** (SQL injection), **SEC-02** (hardcoded credential), **SEC-03** (missing auth on cancel), and **SEC-04** (PII in logs). See `docs/demo-seeded-issues.md`.
+
+### 4.2 Prompt (copy-paste)
 
 ```
 You are a security engineer performing a focused security review of a
@@ -295,68 +250,45 @@ Ignore performance, style, and correctness. Only flag security issues.
 Do not suggest "defense in depth" improvements unless there is a concrete vulnerability.
 ```
 
-### Why It Works
+### 4.3 What to expect
 
-| Technique | What it does |
-|-----------|-------------|
-| **"Security engineer" role** | Shifts the model from "helpful coding assistant" to adversarial mindset — it looks for exploits, not suggestions. |
-| **4 OWASP-aligned categories** | Injection, auth, secrets, data exposure cover the top web app vulnerability families. |
-| **CWE requirement** | Forces precise classification. Without it, the model says "this is a security issue" — with it, the model says "CWE-89: SQL Injection." |
-| **Proof of concept** | The most powerful constraint. Forces the model to demonstrate exploitability, not just theorise about risk. If it can't write a PoC, it's probably not a real finding. |
-| **"Minimal code change"** | Prevents suggestions like "rewrite the entire auth layer." A good security fix is surgical. |
-| **Last negative constraint** | "Don't suggest defense-in-depth unless concrete vulnerability" suppresses noise like "you should add rate limiting, CSP headers, HSTS…" when reviewing a single PR. |
+| Seeded Issue | What Copilot should find |
+|--------------|--------------------------|
+| **SEC-01** | `search` parameter string-interpolated into SQL WHERE clause. Payload: `?search=' OR 1=1 --` returns all 520 orders. |
+| **SEC-02** | Hardcoded credential `sk_live_demo_…` in `middleware/auth.ts`. Secret scanning should flag the `sk_live_` prefix. |
+| **SEC-03** | `POST /:id/cancel` has no authentication middleware — write operation is unprotected. |
+| **SEC-04** | On successful cancel, the full order object (including `customerEmail` and `shippingAddress`) is logged to stdout — PII leak. |
 
-### Expected Output Structure
+### 4.4 Talking points
 
-```markdown
-### 🔴 Critical — SQL Injection — `backend/src/services/orderService.ts` L28
+| Technique | Why it matters |
+|-----------|----------------|
+| **"Security engineer" role** | Shifts the model from "helpful assistant" to adversarial mindset — it looks for exploits, not suggestions. |
+| **OWASP-aligned categories** | Injection, auth, secrets, data exposure cover the top vulnerability families. |
+| **CWE requirement** | Forces precise classification, not just "this is a security issue." |
+| **Proof of concept** | The most powerful constraint — forces the model to demonstrate exploitability. If it can't write a PoC, it's probably not a real finding. |
+| **"Minimal code change"** | Prevents suggestions like "rewrite the entire auth layer." Good security fixes are surgical. |
+| **Last negative constraint** | "Don't suggest defense-in-depth unless concrete vulnerability" suppresses noise like "add rate limiting, CSP headers, HSTS…" |
 
-**CWE:** CWE-89 (Improper Neutralization of Special Elements in SQL)
-
-**Proof of concept:**
-```bash
-curl "http://localhost:3001/api/orders?search=' OR 1=1 --"
-```
-Returns all 520 orders regardless of filter.
-
-**Fix:**
-```ts
-conditions.push("(customerName LIKE ? OR product LIKE ?)");
-params.push(`%${search}%`, `%${search}%`);
-```
-
----
-
-### 🟡 High — Missing Auth on Write Endpoint — `backend/src/routes/orders.ts` L41
-
-**CWE:** CWE-862 (Missing Authorization)
-…
-```
-
-### Weak Version
+### 4.5 Weak version (show for contrast)
 
 ```
 Check this code for security issues.
 ```
 
-**Why it's weak:**
-- No adversarial role → model acts like a friendly tutor, not an attacker
-- No categories → may only check one type (usually injection)
-- No PoC → findings are theoretical
-- No CWE → no way to look up severity or remediation guidance
-- No output structure → paragraph of mixed concerns
-
-### Improved Version
-
-The full prompt above. Key upgrades: security engineer role, OWASP-aligned checklist, CWE classification, proof-of-concept requirement, minimal fix constraint, and noise suppression.
+Why it's weak: no adversarial role, no categories (may only check injection), no PoC, no CWE, no output structure.
 
 ---
 
-## 5. Explain Complex Diff in 3 Layers
+## Step 5 — Explain Complex Code in 3 Layers
 
-**Use with:** Copilot Chat, with the file `riskScoring.ts` open or the diff attached.
+### 5.1 Setup
 
-### The Prompt
+1. Open `backend/src/services/riskScoring.ts` in VS Code.
+2. Open Copilot Chat with the file in context.
+3. Point out to the audience: this file is intentionally written in "legacy" style with nested conditionals and magic numbers.
+
+### 5.2 Prompt (copy-paste)
 
 ```
 Explain the logic in `backend/src/services/riskScoring.ts` at three levels of
@@ -386,62 +318,43 @@ Constraints:
 - Each section must stand alone (a reader can skip to their level).
 ```
 
-### Why It Works
+### 5.3 What to expect
 
-| Technique | What it does |
-|-----------|-------------|
-| **3-layer structure** | Matches how real teams communicate: onboarding, peer review, and design review are different audiences. A single explanation can't serve all three. |
-| **Audience calibration** | "knows JavaScript basics but never seen a scoring algorithm" tells the model exactly what to assume and what to define. |
-| **Analogy request** | Analogies make the junior section memorable. Without asking, the model outputs dry definitions. |
-| **Bullet points for senior** | Seniors scan; paragraphs lose them. Bullet points match their reading pattern. |
-| **Opinionated architecture** | "Be opinionated" unlocks the model's strongest output mode. Without it, the model hedges with "depending on requirements…" for every point. |
-| **Line reference constraint** | Anchors explanations to the actual code, preventing generic advice. |
+Copilot should produce three distinct sections:
+
+- **Junior** — an analogy (e.g., credit score calculator), plain language, ~5 sentences.
+- **Senior** — bullet points covering: magic number thresholds, nested if-else code smell, `else { s += 0 }` dead code, `e.split("@")[1]` risk.
+- **Architecture** — opinionated bullets: scoring belongs in a rules engine, no score-breakdown observability, config should be externalized, runtime throw kills the request.
+
+### 5.4 Talking points
+
+| Technique | Why it matters |
+|-----------|----------------|
+| **3-layer structure** | Matches real teams: onboarding, peer review, and design review are different audiences. |
+| **Audience calibration** | "knows JavaScript basics but never seen a scoring algorithm" tells the model exactly what to assume. |
+| **Analogy request** | Makes the junior section memorable — without asking, the model outputs dry definitions. |
+| **"Be opinionated"** | Unlocks the model's strongest mode. Without it, the model hedges with "depending on requirements…" |
 | **"Do not rewrite"** | Prevents the model from turning an explanation into a refactoring exercise. |
 
-### Expected Output Structure
-
-```markdown
-## Junior Developer
-Think of this file like a credit score calculator for orders. It takes four
-inputs — how much the order costs, how many items, the customer's email,
-and the order status — and outputs a number from 0 to 100…
-
-## Senior Developer
-- **Value tiers (L42-53):** Linear if-else cascade maps `totalPrice` to a score.
-  The thresholds (200, 500, 1000, 2000, 5000) are hardcoded magic numbers.
-- **Nested quantity heuristics (L56-68):** The nesting depth reaches 3 levels…
-- **Code smell:** The `else { s += 0 }` on L53 is dead code…
-
-## Architecture Review
-- **Scoring belongs in a rules engine, not inline code.** The current if-else
-  tree is a maintenance trap — every new rule requires a code change and redeploy…
-- **Observability gap:** There's no way to see which rule contributed what to the
-  final score. In production you'd want a score breakdown…
-```
-
-### Weak Version
+### 5.5 Weak version (show for contrast)
 
 ```
 Explain this code.
 ```
 
-**Why it's weak:**
-- No audience → defaults to mid-level developer, unhelpful for juniors and boring for seniors
-- No structure → single monolithic paragraph
-- No constraints → may rewrite code instead of explaining it
-- No specificity → generic "this function calculates a score" with no reference to lines or variables
-
-### Improved Version
-
-The full prompt above. Key upgrades: 3-layer audience targeting, explicit headings, per-audience format rules (analogy, bullets, opinions), line-reference requirement, and anti-rewrite constraint.
+Why it's weak: no audience, no structure, no constraints. Defaults to a single monolithic paragraph at a generic skill level.
 
 ---
 
-## 6. Generate Regression Tests from Diff
+## Step 6 — Generate Regression Tests from Diff
 
-**Use with:** Copilot Chat with the diff or changed files attached.
+### 6.1 Setup
 
-### The Prompt
+1. Open Copilot Chat in VS Code.
+2. Attach the diff or the changed files for context.
+3. Have `backend/tests/orders.test.ts` open so Copilot can reference the existing test patterns.
+
+### 6.2 Prompt (copy-paste)
 
 ```
 You are a QA engineer writing regression tests for a Node.js backend using Vitest.
@@ -468,83 +381,57 @@ Do not mock the database — use the real in-memory SQLite (same as existing tes
 Do not import from node:test — use vitest imports only.
 ```
 
-### Why It Works
+### 6.3 What to expect
 
-| Technique | What it does |
-|-----------|-------------|
-| **"QA engineer" role** | Shifts from "write a test" to "think about what can break" — adversarial testing mindset. |
-| **4-category framework** | Happy, edge, error, regression — ensures coverage across the behaviour spectrum, not just the happy path. |
-| **"Regression guards" category** | Unique and valuable: tests that would fail if the change is reverted. This is the highest-value test type for PR confidence. |
-| **Style guide reference** | "Use existing patterns in orders.test.ts" ensures generated tests match the codebase conventions. Without it, every generation uses a different style. |
-| **"Drop in and run" constraint** | Forces the output to be complete: correct imports, no placeholders, no `// TODO`. |
-| **Anti-mock constraint** | Matches the existing test strategy (real in-memory SQLite). Without it, the model may generate mock-heavy tests that test nothing. |
-| **Vitest-only constraint** | Prevents the model from mixing in `jest` or `node:test` APIs. |
+A complete, runnable `cancel-reason.test.ts` file with tests covering:
 
-### Expected Output Structure
+| Category | Example test |
+|----------|--------------|
+| **Happy path** | Cancelling a pending order with a reason creates an ops note containing the reason text. |
+| **Edge case** | Cancelling without a reason does not create a note (or creates one with default text). |
+| **Error path** | Cancelling a delivered order throws `StatusTransitionError` / returns 409. |
+| **Regression guard** | If the status-guard check is removed, this test fails — proving BUG-01 fix is in place. |
 
-```typescript
-import { describe, it, expect, beforeAll } from "vitest";
-import { seedDatabase } from "../src/seed.js";
-import {
-  listOrders,
-  cancelOrder,
-  StatusTransitionError,
-  getNotesForOrder,
-} from "../src/services/orderService.js";
+### 6.4 Talking points
 
-beforeAll(() => {
-  seedDatabase(50);
-});
+| Technique | Why it matters |
+|-----------|----------------|
+| **"QA engineer" role** | Shifts from "write a test" to "think about what can break" — adversarial mindset. |
+| **4-category framework** | Happy, edge, error, regression ensures full coverage, not just the happy path. |
+| **"Regression guards"** | The highest-value test type — tests that break if the fix is reverted. Unique concept to highlight. |
+| **Style guide reference** | "Use existing patterns in orders.test.ts" ensures generated tests match codebase conventions. |
+| **"Drop in and run"** | Forces complete output — correct imports, no placeholders, no `// TODO`. |
+| **Anti-mock constraint** | Matches existing strategy (real in-memory SQLite). Without it, the model generates mock-heavy tests that test nothing. |
 
-describe("cancelOrder with reason", () => {
-  it("creates an ops note containing the reason text", () => {
-    const pending = listOrders(1, 100, "pending");
-    const result = cancelOrder(pending.data[0].id, "Customer changed mind");
-    expect(result?.note).toBeDefined();
-    expect(result?.note?.content).toContain("Customer changed mind");
-  });
-
-  it("does not create a note when no reason is provided", () => {
-    // Edge case: reason is undefined
-    const pending = listOrders(1, 100, "pending");
-    const result = cancelOrder(pending.data[1].id);
-    expect(result?.note).toBeUndefined();
-  });
-
-  it("throws StatusTransitionError for cancelled orders", () => {
-    // Regression guard: if the terminal-status check is removed, this fails
-    const cancelled = listOrders(1, 100, "cancelled");
-    expect(() => cancelOrder(cancelled.data[0].id)).toThrow(StatusTransitionError);
-  });
-
-  // ...more tests
-});
-```
-
-### Weak Version
+### 6.5 Weak version (show for contrast)
 
 ```
 Write tests for the cancel order feature.
 ```
 
-**Why it's weak:**
-- No role → generic "helper" tests that exercise happy path only
-- No framework specified → might generate Jest tests in a Vitest project
-- No structure → flat list of tests with no clear coverage strategy
-- No style guide → inconsistent with existing tests
-- No "drop-in" constraint → may output snippets that need manual assembly
+Why it's weak: no role, no framework specified (might generate Jest), no structure, no style guide, may output snippets that need manual assembly.
 
-### Improved Version
+### 6.6 Live verification (optional)
 
-The full prompt above. Key upgrades: QA role, 4-category coverage framework, regression-guard concept, style guide reference, runnable file output, and tech-stack constraints.
+If time permits, drop the generated file into `backend/tests/` and run:
+
+```bash
+npx vitest run cancel-reason
+```
+
+Show the audience whether the tests pass or fail — and discuss why.
 
 ---
 
-## 7. Docs Automation (Release Notes + API Docs Delta)
+## Step 7 — Docs Automation (Release Notes + API Docs Delta)
 
-**Use with:** Copilot Chat or a GitHub Actions workflow that feeds the diff to Copilot.
+### 7.1 Setup
 
-### The Prompt
+1. Open Copilot Chat in VS Code.
+2. Attach the diff or use the PR context.
+3. Have `docs/api.md` and `docs/changelog-template.md` open for reference.
+
+### 7.2 Prompt (copy-paste)
 
 ```
 You are a technical writer generating two documents from a PR diff.
@@ -576,91 +463,52 @@ Constraints:
 - Include a curl example for each changed endpoint.
 ```
 
-### Why It Works
+### 7.3 What to expect
 
-| Technique | What it does |
-|-----------|-------------|
-| **"Technical writer" role** | Shifts from developer-speak to user/consumer-speak. Release notes should say "you can now" not "we added." |
-| **Two-document output** | A single prompt producing two related but distinct artifacts. Splitting into separate prompts would lose the shared context. |
-| **Exact format for release notes** | Changelog entries need consistency. The template enforces What/New/Breaking/Migration — the 4 things every consumer needs. |
-| **Diff format for API docs** | Showing a delta (not the full file) is practical — the presenter applies it directly. |
-| **"API consumers, not contributors"** | Critical audience distinction. Without it, release notes read like commit messages. |
-| **Optional field marking** | Prevents confusion about whether `reason` is required or optional. |
-| **Curl example requirement** | API docs without examples are incomplete. This forces actionable documentation. |
+**Release Notes** should include:
 
-### Expected Output Structure
+- **What changed** — cancel endpoint now accepts an optional `reason` field; system auto-creates ops notes.
+- **Breaking changes** — response shape changed from `Order` to `{ order, note }`.
+- **Migration steps** — update client code to read `response.order`.
 
-```markdown
-## 1. Release Notes Entry
+**API Docs Delta** should show a `diff` block updating `POST /api/orders/:id/cancel` with:
 
-### [Feature] Cancel Order with Reason (PR #42)
-- **What changed:** The cancel-order endpoint now accepts an optional `reason`
-  field. When provided, the system auto-creates an ops note attached to the order.
-- **New behaviour:**
-  - `POST /orders/:id/cancel` accepts `{ "reason": "..." }` in the request body
-  - Response shape changed from `Order` to `{ order: Order, note?: OrderNote }`
-  - Cancelling a delivered, cancelled, or returned order now returns `409 Conflict`
-- **Breaking changes:** Response shape of `POST /orders/:id/cancel` changed
-  (now wrapped in `{ order, note }`)
-- **Migration steps:** Update client code to read `response.order` instead of
-  using the response directly as an Order.
+- New request body schema (`{ "reason": "..." }` marked optional)
+- New response schema (`{ order: {...}, note?: {...} }`)
+- New error responses (404, 409)
+- A `curl` example
 
-## 2. API Docs Delta
+### 7.4 Talking points
 
-```diff
- ### `POST /api/orders/:id/cancel`
+| Technique | Why it matters |
+|-----------|----------------|
+| **"Technical writer" role** | Shifts from developer-speak to consumer-facing language. |
+| **Two-document output** | One prompt producing two related artifacts uses shared context efficiently. |
+| **Exact changelog format** | What/New/Breaking/Migration — the 4 things every consumer needs. |
+| **Diff format for API docs** | Showing a delta (not the full file) is practical — apply it directly. |
+| **"API consumers, not contributors"** | Critical distinction — without it, release notes read like commit messages. |
 
--Cancel an order. No request body needed.
-+Cancel an order with an optional reason.
-
--**Response:** Updated `Order` object or `404`.
-+**Request body:**
-+```json
-+{
-+  "reason": "Customer requested cancellation"  // (optional)
-+}
-+```
-+
-+**Response (200):**
-+```json
-+{
-+  "order": { ... },
-+  "note": { "id": "...", "content": "Order cancelled: ...", ... }
-+}
-+```
-+
-+**Error responses:**
-+| Status | Body | When |
-+|--------|------|------|
-+| `404` | `{ "error": "Order not found" }` | Invalid order ID |
-+| `409` | `{ "error": "Cannot cancel order in \"delivered\" status" }` | Terminal status |
-```
-```
-
-### Weak Version
+### 7.5 Weak version (show for contrast)
 
 ```
 Write release notes and update the API docs for this PR.
 ```
 
-**Why it's weak:**
-- No role → developer tone instead of consumer-facing
-- No format → unstructured paragraphs
-- No "delta" instruction → may rewrite the entire api.md
-- No breaking-change section → consumers miss critical info
-- No curl examples → documentation without examples
-
-### Improved Version
-
-The full prompt above. Key upgrades: technical writer role, two-document structure, exact release note template, diff-format for API delta, audience specification, and curl requirement.
+Why it's weak: no role, no format, no "delta" instruction, no breaking-change section, no curl examples.
 
 ---
 
-## 8. Explain a CodeQL Alert and Propose Fix
+## Step 8 — Explain a CodeQL Alert and Propose Fix
 
-**Use with:** Copilot Chat with the alert details and the flagged file open.
+### 8.1 Setup
 
-### The Prompt
+1. Open `backend/src/services/orderService.ts` in VS Code.
+2. Navigate to the `listOrders` function (around line 28).
+3. Open Copilot Chat.
+
+> **Cheat sheet:** This targets **SEC-01** — the SQL injection in the search parameter. See `docs/demo-seeded-issues.md`.
+
+### 8.2 Prompt (copy-paste)
 
 ```
 You are a security engineer explaining a CodeQL alert to a mid-level developer
@@ -702,95 +550,77 @@ Constraints:
 - Write for a developer who will apply this fix in 5 minutes, not for a security textbook.
 ```
 
-### Why It Works
+### 8.3 What to expect
 
-| Technique | What it does |
-|-----------|-------------|
-| **Audience calibration** | "mid-level developer who has not worked with static analysis" — the model won't assume knowledge of data flow analysis or CWE taxonomy, but won't over-simplify either. |
-| **Alert details injection** | Providing the exact rule, file, line, and message prevents the model from guessing which alert we mean. |
-| **"Trace the data flow"** | The most valuable part of explaining a SAST alert. Without this instruction, the model says "user input reaches a SQL query" without showing the path. |
-| **Exploit payload requirement** | Moves from theoretical to practical. A developer who sees `?search=' OR 1=1 --` returning all 520 orders understands the severity instantly. |
-| **BEFORE/AFTER blocks** | The most actionable format for a fix. The developer can literally diff the blocks. |
-| **"Not escaping/sanitisation" constraint** | Prevents the model from suggesting `input.replace(/'/g, "''")` — the wrong fix for SQL injection. Parameterised queries are the only correct answer. |
-| **Verification section** | Closes the loop: the developer can prove the fix works without relying on re-running CodeQL (which is slow). |
-| **"5 minutes" constraint** | Prevents scope creep. The answer should be surgical, not a refactoring plan. |
-| **"No ORM" constraint** | Matches the repo's actual tech (raw better-sqlite3). Suggesting Prisma or Knex is technically correct but impractical for a 5-minute fix. |
+**What CodeQL Found** — traces the flow: HTTP request `search` param → `routes/orders.ts` → `listOrders()` → string-interpolated into SQL.
 
-### Expected Output Structure
+**Why It Matters** — includes:
 
-```markdown
-## What CodeQL Found
-The `search` query parameter arrives from the HTTP request at
-`routes/orders.ts` L17, is passed to `listOrders()` at L21, and on
-`orderService.ts` L28 is interpolated directly into a SQL string:
+- Exploit: `curl "http://localhost:3001/api/orders?search=' OR 1=1 --"` returns all 520 orders.
+- CWE-89 / OWASP A03:2021 — Injection.
+
+**The Fix** — BEFORE/AFTER blocks showing the change from string interpolation to `?` placeholders:
 
 ```ts
+// BEFORE
 conditions.push(`(customerName LIKE '%${search}%' OR product LIKE '%${search}%')`);
-```
 
-This creates a tainted data flow: user input → SQL string → `db.prepare().get()`.
-
-## Why It Matters
-An attacker can send:
-```
-GET /api/orders?search=' OR 1=1 --
-```
-This returns all 520 orders regardless of filter, bypassing pagination.
-A more targeted payload could extract data from other tables via UNION injection.
-
-- **CWE-89:** Improper Neutralization of Special Elements used in an SQL Command
-- **OWASP Top 10:** A03:2021 — Injection
-
-## The Fix
-
-**Before:**
-```ts
-conditions.push(`(customerName LIKE '%${search}%' OR product LIKE '%${search}%')`);
-```
-
-**After:**
-```ts
+// AFTER
 conditions.push("(customerName LIKE ? OR product LIKE ?)");
 params.push(`%${search}%`, `%${search}%`);
 ```
 
-## Verification
-1. Before fix: `curl "http://localhost:3001/api/orders?search=' OR 1=1 --"` → returns all orders
-2. After fix: same curl → returns 0 results (no orders match the literal string)
-3. Run `npm test` — all 17 tests should still pass
-```
+**Verification** — curl commands showing the exploit before and `npm test` confirmation after.
 
-### Weak Version
+### 8.4 Talking points
+
+| Technique | Why it matters |
+|-----------|----------------|
+| **Audience calibration** | "mid-level dev who hasn't used static analysis" — model won't assume SAST knowledge but won't over-simplify. |
+| **Alert details injection** | Providing rule, file, line, and message prevents the model from guessing which alert. |
+| **"Trace the data flow"** | Most valuable part of explaining a SAST alert. Without it, you get "user input reaches SQL" with no path. |
+| **Exploit payload** | `?search=' OR 1=1 --` returning all 520 orders creates instant understanding of severity. |
+| **BEFORE/AFTER blocks** | Most actionable fix format — the developer can literally diff the blocks. |
+| **"Not escaping/sanitisation"** | Prevents the wrong fix (`input.replace(/'/g, "''")`) — parameterised queries are the only correct answer. |
+| **"5 minutes" constraint** | Prevents scope creep — the answer should be surgical, not a refactoring plan. |
+
+### 8.5 Weak version (show for contrast)
 
 ```
 Explain this CodeQL alert and fix it.
 ```
 
-**Why it's weak:**
-- No alert details → model guesses which alert
-- No audience → explanation too technical or too superficial
-- No output structure → paragraphs mixing explanation and fix
-- No data flow trace → "user input in SQL" with no path
-- No exploit payload → abstract threat, no urgency
-- No verification → developer applies fix blindly
+Why it's weak: no alert details (model guesses), no audience, no data flow trace, no exploit payload, no output structure.
 
-### Improved Version
+### 8.6 Live verification (optional)
 
-The full prompt above. Key upgrades: alert context injection, audience calibration, mandatory data flow trace, exploit payload, CWE/OWASP references, BEFORE/AFTER format, parameterised-query constraint, and verification steps.
+If time permits, demonstrate the exploit live:
+
+```bash
+# BEFORE fix — returns all 520 orders
+curl "http://localhost:3001/api/orders?search=' OR 1=1 --"
+
+# AFTER fix — returns 0 results (literal string match)
+curl "http://localhost:3001/api/orders?search=' OR 1=1 --"
+```
 
 ---
 
 ## Prompt Engineering Principles — Quick Reference
 
-These 8 prompts all apply the same core techniques. Use this table as a cheat sheet:
+These 8 steps all apply the same core techniques. Use this table as a closing slide or handout:
 
-| Principle | What it does | Example from these prompts |
-|-----------|-------------|---------------------------|
-| **Role assignment** | Sets tone and expertise level | "security engineer", "QA engineer", "technical writer" |
-| **Scoped passes** | Focus on one concern per prompt | "correctness-only", "performance issues only", "security vulnerabilities only" |
-| **Structured output** | Exact headings and field names | `## Summary`, `**File & line:**`, `**CWE:**` |
-| **Negative constraints** | Suppress noise and hallucination | "Do NOT invent changes", "Ignore performance and style", "Do not suggest ORMs" |
-| **Audience calibration** | Match depth to reader | "junior dev who knows JS basics", "API consumers, not contributors" |
-| **Example requirements** | Force actionable output | "Include a curl example", "proof of concept payload" |
-| **Severity scales** | Enable triage | 🔴🟡🟢 with definitions per prompt |
-| **Anti-hedge clause** | Get opinionated answers | "Be opinionated", "Only flag real bugs" |
+| # | Principle | What it does | Example from this demo |
+|---|-----------|-------------|------------------------|
+| 1 | **Role assignment** | Sets tone and expertise level | "security engineer", "QA engineer", "technical writer" |
+| 2 | **Scoped passes** | Focus on one concern per prompt | "correctness-only", "performance issues only", "security vulnerabilities only" |
+| 3 | **Structured output** | Exact headings and field names | `## Summary`, `**File & line:**`, `**CWE:**` |
+| 4 | **Negative constraints** | Suppress noise and hallucination | "Do NOT invent changes", "Ignore performance and style", "Do not suggest ORMs" |
+| 5 | **Audience calibration** | Match depth to reader | "junior dev who knows JS basics", "API consumers, not contributors" |
+| 6 | **Example requirements** | Force actionable output | "Include a curl example", "proof of concept payload" |
+| 7 | **Severity scales** | Enable triage | 🔴🟡🟢 with definitions per prompt |
+| 8 | **Anti-hedge clause** | Get opinionated answers | "Be opinionated", "Only flag real bugs" |
+
+### Key takeaway for the audience
+
+> **A great prompt is a contract.** It specifies the role, the scope, the output format, what to include, and what to exclude. The more precise the contract, the more useful and repeatable the output.

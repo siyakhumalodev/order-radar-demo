@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { fetchOrder, cancelOrder as apiCancel } from "../api/client";
 import type { Order } from "../types";
@@ -20,7 +20,7 @@ export default function OrderDetailPage() {
       .catch(() => setError("Order not found"));
   }, [id]);
 
-  const handleCancel = async (reason: string) => {
+  const handleCancel = useCallback(async (reason: string) => {
     if (!id) return;
     try {
       const updated = await apiCancel(id, reason);
@@ -31,9 +31,18 @@ export default function OrderDetailPage() {
       setCancelError("Failed to cancel order. Please try again.");
       setShowCancel(false);
     }
-  };
+  }, [id]);
 
-  const handleCancelClick = () => { setCancelError(""); setShowCancel(true); };
+  const handleCancelClick = useCallback(() => { setCancelError(""); setShowCancel(true); }, []);
+
+  const createdAtFormatted = useMemo(
+    () => order ? new Date(order.createdAt).toLocaleString() : "",
+    [order?.createdAt]
+  );
+  const updatedAtFormatted = useMemo(
+    () => order ? new Date(order.updatedAt).toLocaleString() : "",
+    [order?.updatedAt]
+  );
 
   if (error) {
     return (
@@ -101,13 +110,13 @@ export default function OrderDetailPage() {
         <div className="detail-card">
           <label>Created</label>
           <div className="value" style={{ fontSize: "0.875rem" }}>
-            {new Date(order.createdAt).toLocaleString()}
+          {createdAtFormatted}
           </div>
         </div>
         <div className="detail-card">
           <label>Last Updated</label>
           <div className="value" style={{ fontSize: "0.875rem" }}>
-            {new Date(order.updatedAt).toLocaleString()}
+          {updatedAtFormatted}
           </div>
         </div>
       </div>

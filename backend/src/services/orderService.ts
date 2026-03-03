@@ -54,6 +54,18 @@ export function getOrderById(id: string): Order | undefined {
     | undefined;
 }
 
+/**
+ * Thrown when an order is in a terminal status and cannot be cancelled.
+ */
+export class StatusTransitionError extends Error {
+  public readonly currentStatus: string;
+  constructor(status: string) {
+    super(`Cannot cancel order in "${status}" status`);
+    this.name = "StatusTransitionError";
+    this.currentStatus = status;
+  }
+}
+
 export function cancelOrder(id: string, reason?: string): { order: Order; note?: OrderNote } | undefined {
   const order = getOrderById(id);
   if (!order) return undefined;
@@ -76,18 +88,6 @@ export function cancelOrder(id: string, reason?: string): { order: Order; note?:
   }
 
   return { order: getOrderById(id)!, note: opsNote };
-}
-
-/**
- * Thrown when an order is in a terminal status and cannot be cancelled.
- */
-export class StatusTransitionError extends Error {
-  public readonly currentStatus: string;
-  constructor(status: string) {
-    super(`Cannot cancel order in "${status}" status`);
-    this.name = "StatusTransitionError";
-    this.currentStatus = status;
-  }
 }
 
 export function getNotesForOrder(orderId: string): OrderNote[] {

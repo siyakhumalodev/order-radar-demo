@@ -1,9 +1,13 @@
 import db from "../db.js";
+import { v4 as uuid } from "uuid";
 import type { Order, OrderNote, PaginatedResponse } from "../types.js";
 
 // ──────────────────────────────────────────────
 // Order service – data access layer
 // ──────────────────────────────────────────────
+
+/** Statuses that cannot transition to any other status. */
+const TERMINAL_STATUSES = new Set(["cancelled", "delivered", "returned"]);
 
 export function listOrders(
   page = 1,
@@ -50,17 +54,43 @@ export function getOrderById(id: string): Order | undefined {
     | undefined;
 }
 
-export function cancelOrder(id: string): Order | undefined {
+/**
+ * Thrown when an order is in a terminal status and cannot be cancelled.
+ */
+export class StatusTransitionError extends Error {
+  public readonly currentStatus: string;
+  constructor(status: string) {
+    super(`Cannot cancel order in "${status}" status`);
+    this.name = "StatusTransitionError";
+    this.currentStatus = status;
+  }
+}
+
+export function cancelOrder(id: string, reason?: string): { order: Order; note?: OrderNote } | undefined {
   const order = getOrderById(id);
   if (!order) return undefined;
 
-  // DEMO-SEED: BUG-01 — no status-transition guard; delivered/cancelled orders can be re-cancelled
+  if (TERMINAL_STATUSES.has(order.status)) {
+    throw new StatusTransitionError(order.status);
+  }
+
+  const now = new Date().toISOString();
+
   db.prepare("UPDATE orders SET status = 'cancelled', updatedAt = ? WHERE id = ?").run(
-    new Date().toISOString(),
+    now,
     id
   );
 
-  return getOrderById(id);
+  // Build the updated order from the known mutations — avoids a second SELECT
+  const cancelledOrder: Order = { ...order, status: "cancelled", updatedAt: now };
+
+  // Auto-create an ops note when cancelling
+  let opsNote: OrderNote | undefined;
+  if (reason) {
+    opsNote = addNoteToOrder(id, uuid(), order.customerEmail, `Order cancelled: ${reason}`);
+  }
+
+  return { order: cancelledOrder, note: opsNote };
 }
 
 export function getNotesForOrder(orderId: string): OrderNote[] {

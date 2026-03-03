@@ -26,10 +26,15 @@ export async function fetchOrder(id: string): Promise<Order> {
   return res.json();
 }
 
-export async function cancelOrder(id: string): Promise<Order> {
-  const res = await fetch(`${BASE}/orders/${id}/cancel`, { method: "POST" });
+export async function cancelOrder(id: string, reason?: string): Promise<Order> {
+  const res = await fetch(`${BASE}/orders/${id}/cancel`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reason }),
+  });
   if (!res.ok) throw new Error(`Failed to cancel order: ${res.statusText}`);
-  return res.json();
+  const data = await res.json();
+  return data.order;
 }
 
 export async function fetchNotes(orderId: string): Promise<OrderNote[]> {

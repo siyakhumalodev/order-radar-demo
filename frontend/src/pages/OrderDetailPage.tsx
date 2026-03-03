@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { fetchOrder, cancelOrder as apiCancel } from "../api/client";
 import type { Order } from "../types";
@@ -11,6 +11,7 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [showCancel, setShowCancel] = useState(false);
   const [error, setError] = useState("");
+  const [cancelError, setCancelError] = useState("");
 
   useEffect(() => {
     if (!id) return;
@@ -19,12 +20,29 @@ export default function OrderDetailPage() {
       .catch(() => setError("Order not found"));
   }, [id]);
 
-  const handleCancel = async () => {
+  const handleCancel = useCallback(async (reason: string) => {
     if (!id) return;
-    const updated = await apiCancel(id);
-    setOrder(updated);
-    setShowCancel(false);
-  };
+    try {
+      const updated = await apiCancel(id, reason);
+      setOrder(updated);
+      setShowCancel(false);
+    } catch (err) {
+      console.error("Failed to cancel order", err);
+      setCancelError("Failed to cancel order. Please try again.");
+      setShowCancel(false);
+    }
+  }, [id]);
+
+  const handleCancelClick = useCallback(() => { setCancelError(""); setShowCancel(true); }, []);
+
+  const createdAtFormatted = useMemo(
+    () => order ? new Date(order.createdAt).toLocaleString() : "",
+    [order?.createdAt]
+  );
+  const updatedAtFormatted = useMemo(
+    () => order ? new Date(order.updatedAt).toLocaleString() : "",
+    [order?.updatedAt]
+  );
 
   if (error) {
     return (
@@ -92,24 +110,31 @@ export default function OrderDetailPage() {
         <div className="detail-card">
           <label>Created</label>
           <div className="value" style={{ fontSize: "0.875rem" }}>
-            {new Date(order.createdAt).toLocaleString()}
+          {createdAtFormatted}
           </div>
         </div>
         <div className="detail-card">
           <label>Last Updated</label>
           <div className="value" style={{ fontSize: "0.875rem" }}>
-            {new Date(order.updatedAt).toLocaleString()}
+          {updatedAtFormatted}
           </div>
         </div>
       </div>
 
       {order.status !== "cancelled" && (
-        <button
-          className="btn-danger mt-1"
-          onClick={() => setShowCancel(true)}
-        >
-          Cancel Order
-        </button>
+        <>
+          {cancelError && (
+            <p className="mt-1" style={{ color: "red", fontSize: "0.875rem" }}>
+              {cancelError}
+            </p>
+          )}
+          <button
+            className="btn-danger mt-1"
+            onClick={handleCancelClick}
+          >
+            Cancel Order
+          </button>
+        </>
       )}
 
       {showCancel && (

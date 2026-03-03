@@ -6,6 +6,7 @@ import {
   cancelOrder,
   getNotesForOrder,
   addNoteToOrder,
+  StatusTransitionError,
 } from "../src/services/orderService.js";
 
 // Seed the in-memory DB once before all tests
@@ -58,14 +59,50 @@ describe("orderService", () => {
       const pending = listOrders(1, 100, "pending");
       if (pending.data.length === 0) return; // skip if no pending orders
 
-      const order = cancelOrder(pending.data[0].id);
-      expect(order).toBeDefined();
-      expect(order!.status).toBe("cancelled");
+      const result = cancelOrder(pending.data[0].id);
+      expect(result).toBeDefined();
+      expect(result!.order.status).toBe("cancelled");
     });
 
     it("returns undefined for non-existent order", () => {
       const result = cancelOrder("fake-id");
       expect(result).toBeUndefined();
+    });
+
+    it("cancels with a reason and creates an ops note", () => {
+      const pending = listOrders(1, 100, "pending");
+      if (pending.data.length < 2) return;
+
+      const result = cancelOrder(pending.data[1].id, "Customer changed their mind");
+      expect(result).toBeDefined();
+      expect(result!.order.status).toBe("cancelled");
+      expect(result!.note).toBeDefined();
+      expect(result!.note!.content).toContain("Customer changed their mind");
+    });
+
+    it("cancels without a reason and does not create a note", () => {
+      const processing = listOrders(1, 100, "processing");
+      if (processing.data.length === 0) return;
+
+      const result = cancelOrder(processing.data[0].id);
+      expect(result).toBeDefined();
+      expect(result!.order.status).toBe("cancelled");
+      expect(result!.note).toBeUndefined();
+    });
+
+    it("throws StatusTransitionError for already-cancelled orders", () => {
+      // Self-contained: cancel an order here, then attempt a second cancel
+      const pending = listOrders(1, 100, "pending");
+      const processing = listOrders(1, 100, "processing");
+      const sourceList = pending.data.length > 0 ? pending : processing;
+      if (!sourceList || sourceList.data.length === 0) return;
+
+      const orderId = sourceList.data[0].id;
+      const firstResult = cancelOrder(orderId);
+      expect(firstResult).toBeDefined();
+      expect(firstResult!.order.status).toBe("cancelled");
+
+      expect(() => cancelOrder(orderId)).toThrow(StatusTransitionError);
     });
 
     // INTENTIONALLY MISSING: test that cancelling a "delivered" order should fail

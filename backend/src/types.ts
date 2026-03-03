@@ -33,6 +33,10 @@ export interface OrderNote {
   createdAt: string;
 }
 
+export interface CancelOrderRequest {
+  reason?: string;
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   total: number;

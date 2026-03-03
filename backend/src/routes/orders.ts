@@ -5,6 +5,7 @@ import {
   cancelOrder,
   StatusTransitionError,
 } from "../services/orderService.js";
+import { requireApiKey } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -35,8 +36,7 @@ router.get("/:id", (req: Request, res: Response) => {
 });
 
 // POST /api/orders/:id/cancel
-// DEMO-SEED: SEC-03 — write operation has no authentication middleware
-router.post("/:id/cancel", (req: Request, res: Response) => {
+router.post("/:id/cancel", requireApiKey, (req: Request, res: Response) => {
   const { reason } = req.body ?? {};
 
   if (reason !== undefined && typeof reason !== "string") {

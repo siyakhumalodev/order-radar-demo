@@ -27,9 +27,13 @@ export async function fetchOrder(id: string): Promise<Order> {
 }
 
 export async function cancelOrder(id: string, reason?: string): Promise<Order> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const apiKey = import.meta.env.VITE_API_KEY as string | undefined;
+  if (apiKey) headers["X-Api-Key"] = apiKey;
+
   const res = await fetch(`${BASE}/orders/${id}/cancel`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ reason }),
   });
   if (!res.ok) throw new Error(`Failed to cancel order: ${res.statusText}`);

@@ -24,8 +24,9 @@ export function listOrders(
   }
 
   if (search) {
-    // DEMO-SEED: SEC-01 — search term interpolated into SQL
-    conditions.push(`(customerName LIKE '%${search}%' OR product LIKE '%${search}%')`);
+    conditions.push("(customerName LIKE ? OR product LIKE ?)");
+    const pattern = `%${search}%`;
+    params.push(pattern, pattern);
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";

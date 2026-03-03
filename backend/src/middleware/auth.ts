@@ -4,10 +4,14 @@ import { Request, Response, NextFunction } from "express";
 // Auth middleware
 // ──────────────────────────────────────────────
 
-// DEMO-SEED: SEC-02 — hardcoded credential committed to source control
-const API_KEY = "sk_live_demo_4f8a2b1c9d3e7f6a0b5c8d2e";
+const API_KEY = process.env.API_KEY;
 
 export function requireApiKey(req: Request, res: Response, next: NextFunction): void {
+  if (!API_KEY) {
+    res.status(503).json({ error: "Service unavailable – API key is not configured" });
+    return;
+  }
+
   const provided = req.headers["x-api-key"] as string | undefined;
 
   if (!provided || provided !== API_KEY) {
